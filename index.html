@@ -159,7 +159,7 @@ flex:0 0 54%; display:flex; align-items:flex-start; justify-content:center;
 
 /* ══════════════════ GAME 4: PEN ══════════════════ */
 .stat-section {
-  flex:0 0 70%; margin:10px 10px 0;
+  flex:0 0 70%; margin:10px 200px 0 10px;
   border:3px solid #000; border-radius:14px;
   position:relative; overflow:hidden;
 }
@@ -167,8 +167,8 @@ flex:0 0 54%; display:flex; align-items:flex-start; justify-content:center;
 #penCanvas  { position:absolute; inset:0; }
 #penFlash   { position:absolute; pointer-events:none; display:none; z-index:10; }
 #penFwd {
-  position:absolute; top:50%; left:50%;
-  transform:translate(-50%,-50%);
+  position:absolute; top:50%; right:100px;
+  transform:translateY(-50%);
 }
 .question-section {
   flex:1; min-height:0;
@@ -347,12 +347,12 @@ flex:0 0 54%; display:flex; align-items:flex-start; justify-content:center;
     <span class="game-title">Do you have a pen?</span>
   </div>
   <div class="game-body">
-    <div class="stat-section" id="statSection">
-      <div id="statItems"></div>
-      <canvas id="penCanvas"></canvas>
-      <img id="penFlash" src="./images/flashlight.png" alt="">
-      <button class="fwd" id="penFwd">→</button>
-    </div>
+<div class="stat-section" id="statSection">
+  <div id="statItems"></div>
+  <canvas id="penCanvas"></canvas>
+  <img id="penFlash" src="./images/flashlight.png" alt="">
+</div>
+<button class="fwd" id="penFwd">→</button>
     <div class="question-section" id="questionSection"></div>
   </div>
 </div>
@@ -619,16 +619,21 @@ function startDay(){
     const im=document.createElement('img'); im.src=imgSrc(a.id); im.alt=a.text;
     const sp=document.createElement('span'); sp.textContent=a.text;
     card.appendChild(im); card.appendChild(sp);
-    card.addEventListener('touchstart',onCardTouchStart,{passive:false});
+    card.addEventListener('pointerdown',onCardPointerDown);
     dg.appendChild(card);
   });
 }
 
-function onCardTouchStart(e){
+function onCardPointerDown(e){
   if(dayDropped) return;
   e.preventDefault();
+  // Clean up any orphaned ghost from a previous interrupted drag
+  if(dragState){
+    dragState.ghost.remove();
+    dragState.card.style.opacity='';
+    dragState=null;
+  }
   const card=e.currentTarget;
-  const t=e.touches[0];
   const r=card.getBoundingClientRect();
 
   const ghost=card.cloneNode(true);
@@ -636,7 +641,7 @@ function onCardTouchStart(e){
   Object.assign(ghost.style,{
     position:'fixed', zIndex:'9999', pointerEvents:'none',
     opacity:'0.9', width:r.width+'px', height:r.height+'px',
-    left:(t.clientX-r.width/2)+'px', top:(t.clientY-r.height/2)+'px',
+    left:(e.clientX-r.width/2)+'px', top:(e.clientY-r.height/2)+'px',
     border:'2px solid #000', borderRadius:'8px', background:'#fff',
     display:'flex', flexDirection:'column',
     alignItems:'center', justifyContent:'center',
@@ -646,18 +651,15 @@ function onCardTouchStart(e){
   dragState={ghost, card};
 }
 
-document.addEventListener('touchmove', e=>{
-  e.preventDefault();
+document.addEventListener('pointermove', e=>{
   if(!dragState) return;
-  const t=e.touches[0];
   const r=dragState.card.getBoundingClientRect();
-  dragState.ghost.style.left=(t.clientX-r.width/2)+'px';
-  dragState.ghost.style.top=(t.clientY-r.height/2)+'px';
-},{passive:false});
+  dragState.ghost.style.left=(e.clientX-r.width/2)+'px';
+  dragState.ghost.style.top=(e.clientY-r.height/2)+'px';
+});
 
-document.addEventListener('touchend', e=>{
+document.addEventListener('pointerup', e=>{
   if(!dragState) return;
-  const t=e.changedTouches[0];
   const g=dragState.ghost; const card=dragState.card;
   dragState=null;
   g.remove();
@@ -667,8 +669,7 @@ document.addEventListener('touchend', e=>{
 const zone=document.getElementById('dropZone');
   if(!zone) return;
   const zr=zone.getBoundingClientRect();
-  if(t.clientX>=zr.left&&t.clientX<=zr.right&&t.clientY>=zr.top&&t.clientY<=zr.bottom){
-    dayDropped=true;
+if(e.clientX>=zr.left&&e.clientX<=zr.right&&e.clientY>=zr.top&&e.clientY<=zr.bottom){    dayDropped=true;
     snd('sparkle');
 const slot=document.getElementById('dropSlot');
     slot.innerHTML='';
@@ -855,8 +856,8 @@ function startPen(){
   const flash=document.getElementById('penFlash');
   flash.style.display='none';
   const flashR=Math.min(sw,sh)*0.18;
-  flash.style.width =(flashR*2)+'px';
-  flash.style.height=(flashR*2)+'px';
+  flash.style.width =(flashR*2.5)+'px';
+flash.style.height='auto';
 
   let flPos=null, holding=false;
 
@@ -866,9 +867,10 @@ function startPen(){
     ctx.fillStyle='#000';
     ctx.fillRect(0,0,sw,sh);
     if(flPos){
-      const cx=flPos.x - flashR*1.6; // reveal circle offset left of touch
+      const cx=flPos.x - flashR*2.5; // reveal circle offset left of touch
+	  
       ctx.globalCompositeOperation='destination-out';
-      ctx.beginPath(); ctx.arc(cx, flPos.y, flashR, 0, Math.PI*2);
+      ctx.beginPath(); ctx.arc(cx, flPos.y - flashR*0.8, flashR, 0, Math.PI*2);
       ctx.fill();
       ctx.globalCompositeOperation='source-over';
     }
@@ -878,14 +880,22 @@ function startPen(){
   function updateFinger(ex, ey){
     flPos={ x:ex, y:ey };
     renderMask();
-    flash.style.left=(ex - flashR*0.85)+'px';
-    flash.style.top =(ey - flashR)     +'px';
+    flash.style.left=(ex - flashR*2)+'px';
+    flash.style.top =(ey - flashR*1)     +'px';
   }
 
-  // ── Pointer events (mouse + touch) ───────────────────────────
+// ── Pointer events (mouse + touch) ───────────────────────────
+  const endHold=()=>{
+    holding=false;
+    flash.style.display='none';
+    flPos=null;
+    renderMask();
+  };
+
   canvas.addEventListener('pointerdown', e=>{
     if(penRevealed) return;
     e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
     holding=true;
     flash.style.display='block';
     const r=canvas.getBoundingClientRect();
@@ -897,12 +907,6 @@ function startPen(){
     const r=canvas.getBoundingClientRect();
     updateFinger(e.clientX-r.left, e.clientY-r.top);
   });
-  const endHold=()=>{
-    holding=false;
-    flash.style.display='none';
-    flPos=null;
-    renderMask(); // finger up → restore full black
-  };
   canvas.addEventListener('pointerup',     endHold);
   canvas.addEventListener('pointercancel', endHold);
 
@@ -1191,13 +1195,13 @@ const GRID_W   = Math.round(W * 0.245);
   const BTN_AREA_H = gridH + Math.round(H * 0.04);  // top section
 
   // ── Blender geometry ──────────────────────────────────────────
-  const PLAY_TOP  = BTN_AREA_H;
-  const PLAY_H    = H - PLAY_TOP;
+const PLAY_TOP  = Math.round(H * 0.03);
+const PLAY_H    = H - PLAY_TOP;
 
   const TW_TOP    = Math.round(W * 0.54);   // top (wide) edge of jar
   const TW_BOT    = Math.round(W * 0.30);   // bottom (narrow) edge
 const T_H       = Math.round(PLAY_H * 0.76);
-  const FOOT_H    = Math.round(PLAY_H * 0.15);
+const FOOT_H    = Math.round(PLAY_H * 0.22);
   const MARGIN_V  = Math.round((PLAY_H - T_H - FOOT_H) * 0.45);
 
   const T_TOP_Y   = PLAY_TOP + MARGIN_V;
@@ -1376,7 +1380,7 @@ if(blendT >= 1){
 // Fluid — appears during phase 2 of blending, finishing when blended
     const fluidProgress = blending ? Math.max(0,(blendT-0.55)/0.45) : (blended ? 1 : 0);
     if(fluidProgress > 0){
-      const fillFrac = 0.78;
+      const fillFrac = Math.min(0.88, 0.12 + blendItemCount * 0.038);
       const FY = T_BOT_Y - T_H * fillFrac;
       ctx.beginPath();
       ctx.moveTo(trapLX(FY), FY);
@@ -1457,12 +1461,15 @@ grad.addColorStop(0,   `rgba(${fr2},${fg},${fb},${(0.60*fluidProgress).toFixed(2
   }
 
   // ── Start blending ────────────────────────────────────────────
+let blendItemCount = 0;
+
 function startBlend(){
     if(blending || blended || items.length === 0) return;
     let r=0, g=0, b=0;
     items.forEach(it=>{ const c=FV_COLORS[it.name]; r+=c[0]; g+=c[1]; b+=c[2]; });
     const n = items.length;
     fluidRGB = [Math.round(r/n), Math.round(g/n), Math.round(b/n)];
+    blendItemCount = n;
     blending = true; blendT = 0; flashPhase = 0;
     snd('blend');
   }
